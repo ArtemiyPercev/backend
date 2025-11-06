@@ -2,8 +2,8 @@ from pydantic import BaseModel, Field
 
 class Hotel(BaseModel):
     title: str
-    name: str 
+    location: str 
 
 class HotelPatch(BaseModel):
     title: None | str = None
-    name: None | str = None
+    location: None | str = None
