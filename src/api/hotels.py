@@ -1,4 +1,5 @@
 from fastapi import Query, Body, APIRouter
+from sqlalchemy.ext.asyncio import async_session
 from src.api.dependencies import PaginationParams, PaginationDep
 from src.schemas.hotels import Hotel, HotelPatch
 
@@ -32,10 +33,11 @@ async def get_hotels(
 
 
 @router.delete("/{hotel_id}")
-def delete_hotel(hotel_id: int):
-    global hotels
-    hotels = [hotel for hotel in hotels if hotel["id"] != hotel_id]
-    return {"status": "OK"}
+async def delete_hotel(hotel_id: int):
+    async with async_session_maker() as session:
+        await HotelsRepository(session).delete(id=hotel_id)
+        await session.commit()
+    return {"status": "OK"} 
 
 @router.post("/")
 async def create_hotel(hotel_data: Hotel = Body(openapi_examples={
@@ -64,16 +66,15 @@ async def create_hotel(hotel_data: Hotel = Body(openapi_examples={
 
 
 @router.put("/{hotel_id}")
-def change_hotel(
+async def change_hotel(
     hotel_id: int,
     hotel_data: Hotel
 ):
-    global hotels
-    hotel = [hotel for hotel in hotels if hotel["id"] == hotel_id][0]
-    hotel["title"] = hotel_data.title
-    hotel["name"] = hotel_data.name
 
-    return {"Status: OK"}
+    async with async_session_maker() as session:
+        hotel = await HotelsRepository(session).edit(hotel_data, id=hotel_id)
+        await session.commit()
+    return {"status": "OK", "data": hotel}
 
 
 @router.patch("/{hotel_id}", summary="Поменять одну деталь", description="Обязательно документацию ")
