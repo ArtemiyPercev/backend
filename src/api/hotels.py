@@ -3,8 +3,7 @@ from sqlalchemy.ext.asyncio import async_session
 from src.api.dependencies import PaginationParams, PaginationDep
 from src.schemas.hotels import Hotel, HotelPatch
 
-from sqlalchemy import insert, select
-from src.models.hotels import HotelsOrm
+
 from src.database import async_session_maker, engine
 from src.repositories.hotels import HotelsRepository
 
@@ -30,6 +29,15 @@ async def get_hotels(
         )
 
     return hotels
+
+
+@router.get("/hotel_id")
+async def get_hotel(
+    hotel_id:int):
+    async with async_session_maker() as session:
+        return await HotelsRepository(session).get_one_or_none(id=hotel_id)
+
+
 
 
 @router.delete("/{hotel_id}")
@@ -72,22 +80,20 @@ async def change_hotel(
 ):
 
     async with async_session_maker() as session:
-        hotel = await HotelsRepository(session).edit(hotel_data, id=hotel_id)
+        await HotelsRepository(session).edit(hotel_data, id=hotel_id)
         await session.commit()
-    return {"status": "OK", "data": hotel}
+    return {"status": "OK"}
 
 
 @router.patch("/{hotel_id}", summary="Поменять одну деталь", description="Обязательно документацию ")
-def change_one_thing(
+async def change_one_thing(
     hotel_id: int,
     hotel_data: HotelPatch
 
 ):
-    global hotels
-    hotel = [hotel for hotel in hotels if hotel["id"] == hotel_id][0]
-    if hotel_data.title is not None and hotel_data.title:
-        hotel["title"] = hotel_data.title
-    if hotel_data.name is not None and hotel_data.name:
-        hotel["name"] = hotel_data.name
+
+    async with async_session_maker() as session:
+        await HotelsRepository(session).edit(hotel_data, id=hotel_id, exclude_unset=True)
+        await session.commit()
 
     return {"Status: OK"}
