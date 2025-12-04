@@ -1,7 +1,7 @@
 from fastapi import Query, Body, APIRouter
 from sqlalchemy.ext.asyncio import async_session
 from src.api.dependencies import PaginationParams, PaginationDep
-from src.schemas.hotels import Hotel, HotelPatch
+from src.schemas.hotels import Hotel, HotelPatch, HotelAdd
 
 
 from src.database import async_session_maker, engine
@@ -38,8 +38,6 @@ async def get_hotel(
         return await HotelsRepository(session).get_one_or_none(id=hotel_id)
 
 
-
-
 @router.delete("/{hotel_id}")
 async def delete_hotel(hotel_id: int):
     async with async_session_maker() as session:
@@ -48,7 +46,7 @@ async def delete_hotel(hotel_id: int):
     return {"status": "OK"} 
 
 @router.post("/")
-async def create_hotel(hotel_data: Hotel = Body(openapi_examples={
+async def create_hotel(hotel_data: HotelAdd = Body(openapi_examples={
     "1": {
         "summary": "Сочи",
         "value": {
