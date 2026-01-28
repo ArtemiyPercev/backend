@@ -1,36 +1,65 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException, Response, Request
 
-from passlib.context import CryptContext
-
+from api.dependencies import DBdep, UserIdDep
 from src.schemas.users import UserRequestAdd, UserAdd
 from src.database import async_session_maker
 from src.repositories.users import UsersRepository
-from fastapi.exceptions import HTTPException
-
+from src.services.auth import AuthService
+from src.config import settings
 
 router = APIRouter(prefix="/auth", tags=["authorisation and authentication"])
 
 
+@router.post("/login")
+async def login_user(
+    db: DBdep,
+    data: UserRequestAdd,
+    response: Response
+):
+    user = await db.users.get_user_with_hashed_password(email=data.email)
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+    if not user:
+        raise HTTPException(status_code=401, detail="Пользователь с таким email не зарегистрирован")
+    if not AuthService().verify_password(data.password, user.hashed_password):
+        raise HTTPException(status_code=401, detail="Пароль неверный")
+    access_token = AuthService().create_access_token({"user_id": user.id})
+    response.set_cookie("access_token", access_token)
+    return {"access_token": access_token}
+
 
 @router.post("/register")
 async def register_user(
+    db: DBdep,
     data: UserRequestAdd
 ):
-    async with async_session_maker() as session:
-        existing_user = await UsersRepository(session).get_one_or_none(email=data.email)
-        if existing_user:
-            raise HTTPException(status_code=400, detail="User with this email already exists")
 
-        hashed_password = pwd_context.hash(data.password)
-        new_user_data = UserAdd(
-            email=data.email,
-            hashed_password=hashed_password,
-            name=data.name,
-            surname=data.surname,
-            username=data.username,
-        )
-        user = await UsersRepository(session).add(new_user_data)    
-        await session.commit()
-    return user 
+    hashed_password = AuthService().hash_password(data.password)
+    new_user_data = UserAdd(
+        email=data.email,
+        hashed_password=hashed_password,
+        name=data.name,
+        surname=data.surname,
+        username=data.username,
+    )
+    await db.users.add(new_user_data)
+    await db.commit()
+
+
+@router.get("/me")
+async def get_me(
+    db: DBdep,
+    user_id: UserIdDep,
+):
+
+    user = await db.users.get_one_or_none(id=user_id)
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    return user
+
+
+@router.post("/logout")
+async def logout(
+    response: Response
+):  
+    response.delete_cookie("access_token")
+    return {"status": "OK"}
